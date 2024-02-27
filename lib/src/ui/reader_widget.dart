@@ -10,6 +10,12 @@ import '../../flutter_zxing.dart';
 import '../../flutter_zxing.dart' as zxing;
 import 'scan_mode_dropdown.dart';
 
+mixin ScannerController {
+  void pause();
+  void resume();
+  void stop();
+}
+
 /// Widget to scan a code from the camera stream
 class ReaderWidget extends StatefulWidget {
   const ReaderWidget({
@@ -42,7 +48,10 @@ class ReaderWidget extends StatefulWidget {
     this.lensDirection = CameraLensDirection.back,
     this.loading =
         const DecoratedBox(decoration: BoxDecoration(color: Colors.black)),
+    required this.onScannerControllerCreated,
   });
+
+  final Function(ScannerController controller)? onScannerControllerCreated;
 
   /// Called when a code is detected
   final Function(Code)? onScan;
@@ -132,7 +141,7 @@ class ReaderWidget extends StatefulWidget {
 }
 
 class _ReaderWidgetState extends State<ReaderWidget>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver, ScannerController {
   List<CameraDescription> cameras = <CameraDescription>[];
   CameraDescription? selectedCamera;
   CameraController? controller;
@@ -156,6 +165,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.onScannerControllerCreated?.call(this);
     _isMultiScan = widget.isMultiScan;
     initStateAsync();
   }
@@ -188,9 +198,7 @@ class _ReaderWidgetState extends State<ReaderWidget>
 
     switch (state) {
       case AppLifecycleState.resumed:
-        if (cameras.isNotEmpty && !_isCameraOn) {
-          onNewCameraSelected(cameras.first);
-        }
+        onNewCameraSelected(cameras.first);
         break;
       case AppLifecycleState.detached:
         break;
@@ -218,6 +226,24 @@ class _ReaderWidgetState extends State<ReaderWidget>
         _isCameraOn = true;
       });
     }
+  }
+
+  @override
+  void pause() {
+    controller?.pausePreview();
+  }
+
+  @override
+  void resume() {
+    onNewCameraSelected(cameras.first);
+  }
+
+  @override
+  void stop() {
+    setState(() {
+      _isCameraOn = false;
+    });
+    controller?.dispose();
   }
 
   Future<void> onNewCameraSelected(CameraDescription? cameraDescription) async {
